@@ -1,0 +1,94 @@
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+  - nodes
+  - services
+  - nodes/proxy
+  - nodes/metrics
+  - endpoints
+  - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+  - configmaps
+  verbs: ["get"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+- apiGroups: 
+  - authentication.k8s.io 
+  resources: 
+  - tokenreviews 
+  verbs: 
+  - create 
+- apiGroups: 
+  - authorization.k8s.io 
+  resources: 
+  - subjectaccessreviews 
+  verbs: 
+  - create 
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1beta1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: monitoring
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  labels:
+    prometheus: k8s
+  name: k8s
+  namespace: monitoring
+spec:
+  alerting:
+    alertmanagers:
+    - name: alertmanager-main
+      namespace: monitoring
+      port: web
+  baseImage: quay.io/prometheus/prometheus
+  nodeSelector:
+    beta.kubernetes.io/os: linux
+  replicas: 2
+  resources:
+    requests:
+      memory: 2Gi
+  ruleSelector:
+    matchLabels:
+      prometheus: k8s
+      role: alert-rules
+  #thanos:
+  #  peers: thanos-peers.default.svc:10900
+  serviceAccountName: prometheus
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector:
+    k8s-app: avalanche
+  remotewrite:
+  - url: "http://m3coordinator.m3db.svc.cluster.local:7201/api/v1/prom/remote/write"
+  remoteread:
+  - url: "http://m3coordinator.m3db.svc.cluster.local:7201/api/v1/prom/remote/read"
+  version: v2.4.3
+  storage:
+    volumeClaimTemplate:
+      spec:
+        resources:
+          requests:
+            storage: 500Gi
+        
