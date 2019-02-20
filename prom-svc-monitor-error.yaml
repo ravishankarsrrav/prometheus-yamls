@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  labels:
+    prometheus: k8s
+  name: k8s
+  namespace: monitoring
+spec:
+  alerting:
+    alertmanagers:
+    - name: alertmanager-main
+      namespace: monitoring
+      port: web
+  baseImage: quay.io/prometheus/prometheus
+  nodeSelector:
+    beta.kubernetes.io/os: linux
+  replicas: 2
+  resources:
+    requests:
+      memory: 2Gi
+  ruleSelector:
+    matchLabels:
+      prometheus: k8s
+      role: alert-rules
+  #thanos:
+  #  peers: thanos-peers.default.svc:10900
+  serviceAccountName: prometheus
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector: 
+  k8s-app: avalanche
+  remotewrite:
+  - url: "http://m3coordinator.m3db.svc.cluster.local:7201/api/v1/prom/remote/write"
+  remoteread:
+  - url: "http://m3coordinator.m3db.svc.cluster.local:7201/api/v1/prom/remote/read"
+  version: v2.4.3
+  storage:
+    volumeClaimTemplate:
+      spec:
+        resources:
+          requests:
+            storage: 500Gi
